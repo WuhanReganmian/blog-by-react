@@ -11,6 +11,7 @@ export const AXIOS_METHOD_TYPET = {
   DELETE: 'DELETE',
   PATCH: 'PATCH'
 };
+let cancel: object | null = null; // 取消标识
 /* 方法说明
  * @method request
  * @param api 请求相对地址
@@ -47,6 +48,12 @@ axios.interceptors.request.use(config => {
     ...config.headers,
     ...headConfig
   };
+  // 上次请求未完成取消
+  if (typeof cancel === 'function') cancel();
+
+  config.cancelToken = new axios.CancelToken(c => {
+    cancel = c;
+  });
   return config;
 }, error => {
   // 对请求错误做些什么
@@ -55,6 +62,7 @@ axios.interceptors.request.use(config => {
 
 // 添加响应拦截器
 axios.interceptors.response.use(response => {
+  cancel = null;
   // 对响应数据做点什么
   return new Promise((resolve, reject) => {
     const data = response.data;
@@ -70,6 +78,9 @@ axios.interceptors.response.use(response => {
     resolve(data);
   });
 }, error => {
+  cancel = null;
+  if (axios.isCancel(error)) return new Promise(() => {});
+
   const res = error.response || {};
   const data = res.data || {};
   if (data.code === notAuthCode) {
